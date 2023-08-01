@@ -96,12 +96,11 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
         uint16_t src = topoinfo[i].nodes[0];
         uint16_t dst = topoinfo[i].nodes[1];
         uint32_t bps = topoinfo[i].bandwidth;
-        // uint32_t owd = topoinfo[i].propagation_ms;
+
         NodeContainer nodes = NodeContainer(topo.Get(src), topo.Get(dst));
         auto bufSize = std::max<uint32_t>(DEFAULT_PACKET_SIZE, bps * buffer_ms / 8000);
         int packets = bufSize / DEFAULT_PACKET_SIZE;
-        // std::cout << "link " << i << " bps: " << bps << std::endl;
-        // std::cout << "link " << i << " delay: " << delay_integer << std::endl;
+
         PointToPointHelper pointToPoint;
         pointToPoint.SetDeviceAttribute("DataRate", DataRateValue(DataRate(bps)));
         pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
@@ -151,7 +150,7 @@ typedef struct
 void test_app_on_dumbbell(std::string &instance, float app_start, float app_stop,
                           uint8_t client_log_flag, uint8_t server_log_flag,
                           quic::BackendType type, TriggerRandomLoss *trigger_loss,
-                          const std::string &cc1, const std::string &cc2, uint32_t delay_integer)
+                          const std::string &cc1, const std::string &cc2, uint32_t delay_integer, int index)
 {
     uint32_t non_bottleneck_bw = 100 * kBwUnit;
     uint32_t bottleneck_bw = 10 * kBwUnit;
@@ -255,27 +254,29 @@ void test_app_on_dumbbell(std::string &instance, float app_start, float app_stop
             server_app->set_trace(server_trace);
         }
     }
-    client_config_t config1[2] = {
-        [0] = {.cc_name = cc1.c_str(), .start = app_start, .stop = app_stop},
-        [1] = {.cc_name = cc1.c_str(), .start = app_start, .stop = app_stop},
-    };
-    client_config_t config2[2] = {
-        [0] = {.cc_name = cc2.c_str(), .start = app_start, .stop = app_stop},
-        [1] = {.cc_name = cc2.c_str(), .start = app_start, .stop = app_stop},
-    };
+    // client_config_t config1[100];
+    // client_config_t config2[100];
+    // for (int i = 0; i < index; i++)
+    // {
+    //     config1[i] = {.cc_name = cc1.c_str(), .start = app_start, .stop = app_stop};
+    //     config2[i] = {.cc_name = cc1.c_str(), .start = app_start, .stop = app_stop};
+    // }
+    // client_config_t config2[100] = {
+    //     [0] = {.cc_name = cc2.c_str(), .start = app_start, .stop = app_stop},
+    //     [1] = {.cc_name = cc2.c_str(), .start = app_start, .stop = app_stop},
+    // };
     Ptr<Node> h0 = topo.Get(0);
     Ptr<Node> h4 = topo.Get(4);
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < index; i++)
     {
         // install client
-        client_config_t *config = config1;
-        Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, config[i].cc_name);
+        Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, cc1.c_str());
         h0->AddApplication(client_app);
         client_app->Bind();
         InetSocketAddress client_addr = client_app->GetLocalAddress();
         client_app->set_peer(server_addr1.GetIpv4(), server_addr1.GetPort());
-        client_app->SetStartTime(Seconds(config[i].start));
-        client_app->SetStopTime(Seconds(config[i].stop));
+        client_app->SetStartTime(Seconds(app_start));
+        client_app->SetStopTime(Seconds(app_stop));
         Ns3QuicAddressPair addr_pair(client_addr, server_addr1);
         if (client_log_flag & E_QC_ALL)
         {
@@ -291,6 +292,10 @@ void test_app_on_dumbbell(std::string &instance, float app_start, float app_stop
             {
                 client_app->SetRateTraceFuc(MakeCallback(&Ns3QuicClientTrace::OnSendRate, trace));
             }
+            if (client_log_flag & E_QC_CWND)
+            {
+                client_app->SetCwndTraceFun(MakeCallback(&Ns3QuicClientTrace::OnCwnd, trace));
+            }
             client_traces.push_back(trace);
         }
         if (server_log_flag & E_QS_ALL)
@@ -298,17 +303,16 @@ void test_app_on_dumbbell(std::string &instance, float app_start, float app_stop
             server_trace->AddMonitorAddressPair(addr_pair);
         }
     }
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < index; i++)
     {
         // install client
-        client_config_t *config = config2;
-        Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, config[i].cc_name);
+        Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, cc1.c_str());
         h4->AddApplication(client_app);
         client_app->Bind();
         InetSocketAddress client_addr = client_app->GetLocalAddress();
         client_app->set_peer(server_addr2.GetIpv4(), server_addr2.GetPort());
-        client_app->SetStartTime(Seconds(config[i].start));
-        client_app->SetStopTime(Seconds(config[i].stop));
+        client_app->SetStartTime(Seconds(app_start));
+        client_app->SetStopTime(Seconds(app_stop));
         Ns3QuicAddressPair addr_pair(client_addr, server_addr2);
         if (client_log_flag & E_QC_ALL)
         {
@@ -323,6 +327,10 @@ void test_app_on_dumbbell(std::string &instance, float app_start, float app_stop
             if (client_log_flag & E_QC_SEND_RATE)
             {
                 client_app->SetRateTraceFuc(MakeCallback(&Ns3QuicClientTrace::OnSendRate, trace));
+            }
+            if (client_log_flag & E_QC_CWND)
+            {
+                client_app->SetCwndTraceFun(MakeCallback(&Ns3QuicClientTrace::OnCwnd, trace));
             }
             client_traces.push_back(trace);
         }
@@ -370,6 +378,7 @@ int main(int argc, char *argv[])
     LogComponentEnable("QuicClientApp", LOG_LEVEL_ALL);
     // LogComponentEnable("QuicServerApp",LOG_LEVEL_ALL);
     std::string topo("p2p");
+    std::string index = std::string("20");
     std::string instance = std::string("1");
     std::string loss_str("0"); // config random loss
     std::string link_delay_str("0");
@@ -379,6 +388,7 @@ int main(int argc, char *argv[])
     CommandLine cmd;
     cmd.AddValue("topo", "topology", topo);
     cmd.AddValue("it", "instacne", instance);
+    cmd.AddValue("i", "index", index);
     cmd.AddValue("folder", "folder name to collect data", data_folder);
     cmd.AddValue("lo", "loss", loss_str); // 10 means the dev will introduce 10/1000 % random loss
     cmd.AddValue("de", "link_delay", link_delay_str);
@@ -387,7 +397,7 @@ int main(int argc, char *argv[])
     cmd.Parse(argc, argv);
     int loss_integer = std::stoi(loss_str);
     int delay_integer = std::stoi(link_delay_str);
-
+    int index_integer = std::stoi(index);
     double random_loss = loss_integer * 1.0 / 100;
     std::unique_ptr<TriggerRandomLoss> triggerloss = nullptr;
     if (loss_integer > 0)
@@ -460,15 +470,15 @@ int main(int argc, char *argv[])
         // BANDWIDTH
 
         quic::BackendType type = quic::BackendType::BANDWIDTH;
-        QuicClientTraceType client_log_flag = E_QC_IN_FLIGHT | E_QC_SEND_RATE;
-        QuicServerTraceType server_log_flag = E_QS_OWD | E_QS_LOST | E_QS_GOODPUT;
+        QuicClientTraceType client_log_flag = E_QC_ALL;
+        QuicServerTraceType server_log_flag = E_QS_ALL;
         RegisterExternalCongestionFactory();
         if (0 == topo.compare("dumbbell"))
         {
             test_app_on_dumbbell(instance, startTime, simDuration,
                                  client_log_flag, server_log_flag,
                                  type, triggerloss.get(),
-                                 cc1, cc2, delay_integer);
+                                 cc1, cc2, delay_integer, index_integer);
         }
     }
     return 0;
