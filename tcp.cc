@@ -1,14 +1,4 @@
-/** Network topology
- *       n0            n1
- *        |            |
- *        | l0         | l2
- *        |            |
- *        n2---l1------n3
- *        |            |
- *        |  l3        | l4
- *        |            |
- *        n4           n5
- */
+
 #include <string>
 #include <unistd.h>
 #include <stdio.h>
@@ -76,8 +66,8 @@ struct LinkProperty
 uint32_t CalMaxRttInDumbbell(LinkProperty *topoinfo, int links)
 {
     uint32_t rtt1 = 2 * (topoinfo[0].propagation_ms + topoinfo[1].propagation_ms + topoinfo[2].propagation_ms);
-    uint32_t rtt2 = 2 * (topoinfo[1].propagation_ms + topoinfo[3].propagation_ms + topoinfo[4].propagation_ms);
-    return std::max<uint32_t>(rtt1, rtt2);
+
+    return rtt1;
 }
 
 #define DEFAULT_PACKET_SIZE 1500
@@ -95,17 +85,28 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
         uint16_t src = topoinfo[i].nodes[0];
         uint16_t dst = topoinfo[i].nodes[1];
         uint32_t bps = topoinfo[i].bandwidth;
-        // uint32_t owd = topoinfo[i].propagation_ms;
+        uint32_t owd = topoinfo[i].propagation_ms;
         NodeContainer nodes = NodeContainer(topo.Get(src), topo.Get(dst));
         auto bufSize = std::max<uint32_t>(DEFAULT_PACKET_SIZE, bps * buffer_ms / 8000);
         int packets = bufSize / DEFAULT_PACKET_SIZE;
-        std::cout << bps << std::endl;
+        // std::cout << "buffer_ms: " << buffer_ms << std::endl;
+        // std::cout << "bps: "<<bps<<std::endl;
+        // std::cout << "bufSize: "<<bufSize<<std::endl;
+        // std::cout << "packets: "<<packets<<std::endl;
         PointToPointHelper pointToPoint;
         pointToPoint.SetDeviceAttribute("DataRate", DataRateValue(DataRate(bps)));
-        pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
+        // pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        if (delay_integer == 0)
+        {
+            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        }
+        else
+        {
+            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
+        }
         if (bottleneck_i == i)
         {
-            pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(20) + "p"));
+            pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
         }
         else
         {
@@ -133,7 +134,7 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
     return topo;
 }
 static const double startTime = 0;
-static const double simDuration = 600.0;
+static const double simDuration = 200.0;
 //./waf --run "scratch/tcp-dumbbell --it=3 --cc1=bbr --cc2=bbr --folder=bbr1 "
 int main(int argc, char *argv[])
 {
@@ -146,7 +147,7 @@ int main(int argc, char *argv[])
     std::string cc2("bbr2");
     std::string folder_name("no-one");
     std::string loss_str("1");
-    std::string index = std::string("20");
+    std::string index = std::string("1");
     CommandLine cmd;
     cmd.AddValue("it", "instacne", instance);
     cmd.AddValue("de", "link_delay", link_delay_str);
@@ -160,15 +161,15 @@ int main(int argc, char *argv[])
     int delay_integer = std::stoi(link_delay_str);
     int index_integer = std::stoi(index);
 
-    std::cout << cc1 << std::endl;
-    std::cout << index_integer << std::endl;
-    std::cout << index << std::endl;
+    // std::cout << cc1 << std::endl;
+    // std::cout << index_integer << std::endl;
+    // std::cout << index << std::endl;
     uint32_t kMaxmiumSegmentSize = 1400;
     Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(200 * kMaxmiumSegmentSize));
     Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(200 * kMaxmiumSegmentSize));
     Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(kMaxmiumSegmentSize));
     int loss_integer = std::stoi(loss_str);
-    std::cout << loss_integer << std::endl;
+    // std::cout << loss_integer << std::endl;
     double random_loss = loss_integer * 1.0 / 100;
     std::unique_ptr<TriggerRandomLoss> triggerloss = nullptr;
     if (loss_integer > 0)
@@ -207,17 +208,18 @@ int main(int argc, char *argv[])
         TcpBbrDebug::SetTraceFolder(trace_folder.c_str());
         TcpTracer::SetTraceFolder(trace_folder.c_str());
     }
-    uint32_t bw_unit = 1000000; // 1Mbps;
-    uint32_t non_bottleneck_bw = 100 * bw_unit;
-    uint32_t bottleneck_bw = 10 * bw_unit;
-    uint32_t links = 5;
+    const uint32_t MBwUnit = 1000000; // 1Mbps;
+    // const uint32_t GBwUnit = 1000000000; // 1Mbps;
+
+    uint32_t non_bottleneck_bw = 50 * MBwUnit;
+    uint32_t bottleneck_bw = 50 * MBwUnit;
+    uint32_t links = 3;
     int bottleneck_i = 1;
     LinkProperty topoinfo1[] = {
         [0] = {0, 2, 0, 10},
         [1] = {2, 3, 0, 10},
         [2] = {3, 1, 0, 10},
-        [3] = {2, 4, 0, 10},
-        [4] = {3, 5, 0, 10},
+
     };
     {
         LinkProperty *info_ptr = topoinfo1;
@@ -276,33 +278,21 @@ int main(int argc, char *argv[])
 
     // install server on h1
     Address tcp_sink_addr1;
-    {
-        Ptr<Node> host = topo.Get(1);
-        Ptr<Ipv4> ipv4 = host->GetObject<Ipv4>();
-        Ipv4Address serv_ip = ipv4->GetAddress(1, 0).GetLocal();
-        InetSocketAddress socket_addr = InetSocketAddress{serv_ip, serv_port};
-        tcp_sink_addr1 = socket_addr;
-        Ptr<TcpServer> server = CreateObject<TcpServer>(tcp_sink_addr1);
-        host->AddApplication(server);
-        server->SetStartTime(Seconds(0.0));
-    }
-    // install server on h5
-    Address tcp_sink_addr2;
-    {
-        Ptr<Node> host = topo.Get(5);
-        Ptr<Ipv4> ipv4 = host->GetObject<Ipv4>();
-        Ipv4Address serv_ip = ipv4->GetAddress(1, 0).GetLocal();
-        InetSocketAddress socket_addr = InetSocketAddress{serv_ip, serv_port};
-        tcp_sink_addr2 = socket_addr;
-        Ptr<TcpServer> server = CreateObject<TcpServer>(tcp_sink_addr2);
-        host->AddApplication(server);
-        server->SetStartTime(Seconds(0.0));
-    }
 
     uint64_t totalTxBytes = 100000 * 1500;
     // tcp client1 on h0
     for (int i = 0; i < index_integer; i++)
     {
+        Ptr<Node> host_server = topo.Get(1);
+        Ptr<Ipv4> ipv4 = host_server->GetObject<Ipv4>();
+        Ipv4Address serv_ip = ipv4->GetAddress(1, 0).GetLocal();
+        InetSocketAddress socket_addr = InetSocketAddress{serv_ip, serv_port};
+        serv_port += 1;
+        tcp_sink_addr1 = socket_addr;
+        Ptr<TcpServer> server = CreateObject<TcpServer>(tcp_sink_addr1);
+        host_server->AddApplication(server);
+        server->SetStartTime(Seconds(0.0));
+        // std::cout << i << std::endl;
         Ptr<Node> host = topo.Get(0);
         Ptr<TcpClient> client = CreateObject<TcpClient>(totalTxBytes, TcpClient::E_TRACE_ALL);
         host->AddApplication(client);
@@ -311,38 +301,6 @@ int main(int argc, char *argv[])
         client->SetStartTime(Seconds(startTime));
         client->SetStopTime(Seconds(simDuration));
     }
-
-    // // tcp client2 on h0
-    // {
-    //     Ptr<Node> host = topo.Get(0);
-    //     Ptr<TcpClient> client = CreateObject<TcpClient>(totalTxBytes, TcpClient::E_TRACE_RTT | TcpClient::E_TRACE_INFLIGHT | TcpClient::E_TRACE_RATE);
-    //     host->AddApplication(client);
-    //     client->ConfigurePeer(tcp_sink_addr1);
-    //     client->SetCongestionAlgo(cc1);
-    //     client->SetStartTime(Seconds(startTime));
-    //     client->SetStopTime(Seconds(simDuration));
-    // }
-    // tcp client3 on h4
-    for (int i = 0; i < index_integer; i++)
-    {
-        Ptr<Node> host = topo.Get(4);
-        Ptr<TcpClient> client = CreateObject<TcpClient>(totalTxBytes, TcpClient::E_TRACE_RTT | TcpClient::E_TRACE_INFLIGHT | TcpClient::E_TRACE_RATE);
-        host->AddApplication(client);
-        client->ConfigurePeer(tcp_sink_addr2);
-        client->SetCongestionAlgo(cc2);
-        client->SetStartTime(Seconds(startTime));
-        client->SetStopTime(Seconds(simDuration));
-    }
-    // // tcp client4 on h4
-    // {
-    //     Ptr<Node> host = topo.Get(4);
-    //     Ptr<TcpClient> client = CreateObject<TcpClient>(totalTxBytes, TcpClient::E_TRACE_RTT | TcpClient::E_TRACE_INFLIGHT | TcpClient::E_TRACE_RATE);
-    //     host->AddApplication(client);
-    //     client->ConfigurePeer(tcp_sink_addr2);
-    //     client->SetCongestionAlgo(cc2);
-    //     client->SetStartTime(Seconds(startTime));
-    //     client->SetStopTime(Seconds(simDuration));
-    // }
 
     Simulator::Stop(Seconds(simDuration + 20.0));
     Simulator::Run();
