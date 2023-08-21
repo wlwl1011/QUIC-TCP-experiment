@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-# 1. Set default style
+# 1. Set the default style
 plt.style.use('default')
-plt.rcParams['figure.figsize'] = (10, 6)
+plt.rcParams['figure.figsize'] = (12, 8)  # Adjusted for a larger graph
 plt.rcParams['font.size'] = 12
 
 # 2. Prepare data
@@ -91,12 +91,8 @@ for standard in st:
                     # print(cc,d_i,max_owd_QUIC[cc_i][d_i])    
                         
 
-                   
-                   
-
-# 3. Plot average one-way delay for QUIC and TCP together
-
-plt.figure(figsize=(12, 8))
+# 3. Draw a graph representing the range of OWDs for all congestion control algorithms according to the error rate
+fig, ax = plt.subplots(figsize=(12, 8))
 
 # We will set up data for each congestion control algorithm
 box_data_by_cc = {algorithm: [] for algorithm in cca}
@@ -109,29 +105,51 @@ for cc_idx, cc_label in enumerate(cca):
 
 # We will plot each congestion control algorithm's data side-by-side for each error rate
 positions = []
-labels = []
+all_data = []
 
 for idx, error_rate in enumerate(count_loss):
-    current_position = idx * (len(cca) + 1)  # offset each group by the number of algorithms + 1 for spacing
+    current_data_group = []
     for cc_idx, cc_label in enumerate(cca):
         box_data = box_data_by_cc[cc_label][idx]
-        pos = current_position + cc_idx
-        bp = plt.boxplot(box_data, vert=True, positions=[pos], patch_artist=True)
-        patch = bp['boxes'][0]
-        patch.set_facecolor('C' + str(cc_idx))  # use a distinct color for each algorithm
-    positions.append(current_position + len(cca) / 2)  # center the label for each group
-    labels.append(str(error_rate))
+        current_data_group.append(box_data)
+    all_data.append(current_data_group)
 
-plt.xticks(positions, labels)
-plt.xlabel('Loss Count')
-plt.ylabel('One-Way Delay')
-plt.title('OWD Range for Each Congestion Control Algorithm in QUIC Grouped by Loss Count')
-plt.legend(cca)
-plt.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
+# Define colors
+colors = {
+    'bbr': 'pink',
+    'cubic': 'gray',
+    'vegas': 'brown',
+    'reno': 'skyblue'
+}
+
+# Define positions for each box
+group_width = len(cca)
+positions = [i * (group_width + 1) + j for i in range(len(count_loss)) for j in range(group_width)]
+bp = ax.boxplot([item for sublist in box_data_by_cc.values() for item in sublist], positions=positions, patch_artist=True)
+
+# Set colors
+for i, box in enumerate(bp['boxes']):
+    cc_label = cca[i % len(cca)]
+    box.set_facecolor(colors[cc_label])
+
+# Adjust x-ticks' positions to be in the center of each group of four boxes
+ax.set_xticks([(group_width + 1) * i + group_width / 2 for i in range(len(count_loss))])
+ax.set_xticklabels(count_loss)
+ax.set_xlabel('Loss Count')
+ax.set_ylabel('One-Way Delay')
+ax.set_title('OWD Range for Each Congestion Control Algorithm in QUIC Grouped by Loss Count')
+
+# Legend based on colors
+from matplotlib.patches import Patch
+legend_elements = [Patch(facecolor=colors[cc], label=cc) for cc in cca]
+ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
+
+
+ax.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
 
 # Saving the plot to the designated output directory
 output_directory = "./plots/"
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
-plt.savefig(f"{output_directory}/all_cc_QUIC_owd_range_boxplot.png", dpi=300)
+plt.savefig(f"{output_directory}/all_cc_QUIC_owd_range_boxplot_colored.png", dpi=300)
 plt.show()
