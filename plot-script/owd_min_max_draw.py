@@ -160,7 +160,7 @@ positions = [i + j * (group_width + 1) for j in range(len(count_loss)) for i in 
 bp = ax.boxplot(all_data, positions=positions, patch_artist=True)
 
 # Set the x-tick labels and centers
-xtick_centers = [(group_width) * i + group_width / 2 for i in range(len(count_loss))]
+xtick_centers = [(group_width+1) * i + group_width / 2 for i in range(len(count_loss))]
 ax.set_xticks(xtick_centers)
 
 # Set colors
