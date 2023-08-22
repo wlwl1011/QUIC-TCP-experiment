@@ -197,12 +197,12 @@ ax.set_title('OWD Range for Each Congestion Control Algorithm in QUIC Grouped by
 # Legend based on colors
 # Legend based on colors
 from matplotlib.patches import Patch
-legend_elements = [Patch(facecolor=darken_color(pltcolors.to_rgb(colors[cc])), label=f"{cc} TCP") for cc in cca] + \
-                  [Patch(facecolor=colors[cc], label=cc) for cc in cca]
-ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
+legend_elements = [Patch(facecolor=darken_color(pltcolors.to_rgb(colors[cc])), label=f"TCP with {cc}") for cc in cca] + \
+                  [Patch(facecolor=colors[cc], label=f"QUIC with {cc}") for cc in cca]
+ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.8, 1))
 
 ax.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
-
+plt.ylim(100, 990)
 # Saving the plot to the designated output directory
 output_directory = "./plots/"
 if not os.path.exists(output_directory):
