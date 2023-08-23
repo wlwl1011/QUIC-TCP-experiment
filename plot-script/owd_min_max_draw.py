@@ -36,6 +36,12 @@ min_owd_TCP = np.zeros((4, 6))
 max_owd_TCP = np.zeros((4, 6))
 
 
+# Initialize a data storage list for QUIC and TCP
+data_list_QUIC = [[[] for _ in range(6)] for _ in range(4)]
+data_list_TCP = [[[] for _ in range(6)] for _ in range(4)]
+
+
+
 data_points_QUIC = {algorithm: [] for algorithm in cca}
 
 for standard in st:
@@ -54,7 +60,7 @@ for standard in st:
                     if pro == 'QUIC':
                         initial_port = 49153
                         initial_server_port = 1234
-                        for i in range(2):
+                        for i in range(1):
                             file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.1.1:{}_10.1.3.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
                                 if os.stat(file_path).st_size == 0:
@@ -69,28 +75,13 @@ for standard in st:
                                 print(file_path, "파일이 없습니다.")
                             initial_port += 1
                             #initial_server_port += 1
-                        initial_port = 49153    
-                        for i in range(2):
-                            file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.4.2:{}_10.1.5.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
-                            if os.path.isfile(file_path):
-                                if os.stat(file_path).st_size == 0:
-                                    print(file_path,'파일이 비어있습니다.')
-                                else:
-                                    with open(file_path, 'r') as f:
-                                        for line in f:
-                                            cols = line.strip().split()
-                                            if cols and len(cols) == 4:
-                                                data.append(int(cols[2]))  # 시간이고 4
-                            else:
-                                print(file_path, "파일이 없습니다.")
-                            initial_port += 1
-                            #initial_server_port += 1    
+                        
                     
                     else:
                         # TCP
                         initial_port = 49153
                         initial_server_port = 5000
-                        for i in range(2):
+                        for i in range(1):
                             file_path = defualt + '/{}/{}/{}/{}/{}/10.1.1.1_{}_10.1.3.2_{}_rtt.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
                                 if os.stat(file_path).st_size == 0:
@@ -104,41 +95,16 @@ for standard in st:
                             else:
                                 print(file_path, "파일이 없습니다.")
                             initial_port += 1
-                        #initial_server_port += 1
-                        initial_port = 49153
-                        initial_server_port = 5000
-                        for i in range(2):
-                            file_path = defualt + '/{}/{}/{}/{}/{}/10.1.4.2_{}_10.1.5.2_{}_rtt.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
-                            if os.path.isfile(file_path):
-                                if os.stat(file_path).st_size == 0:
-                                    print(name, '파일이 비어있습니다.')
-                                else:
-                                    with open(file_path, 'r') as f:
-                                        for line in f:
-                                            cols = line.strip().split()
-                                            if cols and len(cols) == 2:
-                                                data.append(int(cols[1]))
-                            else:
-                                print(file_path, "파일이 없습니다.")
-                            initial_port += 1
+                        
                  
-                 # Storing the average of the 5 min values and 5 max values   
-                if data:
-                    #print(data)
-                    mins.append(min(data))
-                    maxs.append(max(data))      
-                else:
-                    print('oh no! There isnt data!',d_i, cc,number)    
-
+            
                 if pro == 'QUIC':
-                
-                    min_owd_QUIC[cc_i][d_i] = sum(mins) / len(mins) if mins else 0
-                    max_owd_QUIC[cc_i][d_i] = sum(maxs) / len(maxs) if maxs else 0   
+                    
+                    data_list_QUIC[cc_i][d_i].extend(data)   
                     # print(cc,d_i,min_owd_QUIC[cc_i][d_i])     
                     # print(cc,d_i,max_owd_QUIC[cc_i][d_i])   
                 else:
-                    min_owd_TCP[cc_i][d_i] = sum(mins) / len(mins) if mins else 0
-                    max_owd_TCP[cc_i][d_i] = sum(maxs) / len(maxs) if maxs else 0  
+                    data_list_TCP[cc_i][d_i].extend(data)
                     # min_owd_TCP[cc_i][d_i] = 100
                     # max_owd_TCP[cc_i][d_i] = 800
 
@@ -148,6 +114,7 @@ for standard in st:
 # 3. Draw a graph representing the range of OWDs for all congestion control algorithms according to the error rate
 fig, ax = plt.subplots(figsize=(15, 10))
 
+# Modify the graph plotting section:
 all_data = []
 
 # Iterate over each error rate
@@ -157,16 +124,14 @@ for error_rate_idx in range(len(count_loss)):
     # For TCP first
     for cc_idx, cc_label in enumerate(cca):
         # Get data for TCP
-        min_val_tcp = min_owd_TCP[cc_idx][error_rate_idx]
-        max_val_tcp = max_owd_TCP[cc_idx][error_rate_idx]
-        current_error_data.append([min_val_tcp, max_val_tcp])
+        data_tcp = data_list_TCP[cc_idx][error_rate_idx]
+        current_error_data.append(data_tcp)
         
     # Then for QUIC
     for cc_idx, cc_label in enumerate(cca):
         # Get data for QUIC
-        min_val_quic = min_owd_QUIC[cc_idx][error_rate_idx]
-        max_val_quic = max_owd_QUIC[cc_idx][error_rate_idx]
-        current_error_data.append([min_val_quic, max_val_quic])
+        data_quic = data_list_QUIC[cc_idx][error_rate_idx]
+        current_error_data.append(data_quic)
     
     all_data.extend(current_error_data)  # Add the data for the current error rate
 
