@@ -54,7 +54,7 @@ for standard in st:
                     if pro == 'QUIC':
                         initial_port = 49153
                         initial_server_port = 1234
-                        for i in range(5):
+                        for i in range(2):
                             file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.1.1:{}_10.1.3.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
                                 if os.stat(file_path).st_size == 0:
@@ -70,27 +70,27 @@ for standard in st:
                             initial_port += 1
                             #initial_server_port += 1
                         initial_port = 49153    
-                        # for i in range(5):
-                        #     file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.4.2:{}_10.1.5.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
-                        #     if os.path.isfile(file_path):
-                        #         if os.stat(file_path).st_size == 0:
-                        #             print(file_path,'파일이 비어있습니다.')
-                        #         else:
-                        #             with open(file_path, 'r') as f:
-                        #                 for line in f:
-                        #                     cols = line.strip().split()
-                        #                     if cols and len(cols) == 4:
-                        #                         data.append(int(cols[2]))  # 시간이고 4
-                        #     else:
-                        #         print(file_path, "파일이 없습니다.")
-                        #     initial_port += 1
+                        for i in range(2):
+                            file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.4.2:{}_10.1.5.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
+                            if os.path.isfile(file_path):
+                                if os.stat(file_path).st_size == 0:
+                                    print(file_path,'파일이 비어있습니다.')
+                                else:
+                                    with open(file_path, 'r') as f:
+                                        for line in f:
+                                            cols = line.strip().split()
+                                            if cols and len(cols) == 4:
+                                                data.append(int(cols[2]))  # 시간이고 4
+                            else:
+                                print(file_path, "파일이 없습니다.")
+                            initial_port += 1
                             #initial_server_port += 1    
                     
                     else:
                         # TCP
                         initial_port = 49153
                         initial_server_port = 5000
-                        for i in range(5):
+                        for i in range(2):
                             file_path = defualt + '/{}/{}/{}/{}/{}/10.1.1.1_{}_10.1.3.2_{}_rtt.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
                                 if os.stat(file_path).st_size == 0:
@@ -105,6 +105,22 @@ for standard in st:
                                 print(file_path, "파일이 없습니다.")
                             initial_port += 1
                         #initial_server_port += 1
+                        initial_port = 49153
+                        initial_server_port = 5000
+                        for i in range(2):
+                            file_path = defualt + '/{}/{}/{}/{}/{}/10.1.4.2_{}_10.1.5.2_{}_rtt.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
+                            if os.path.isfile(file_path):
+                                if os.stat(file_path).st_size == 0:
+                                    print(name, '파일이 비어있습니다.')
+                                else:
+                                    with open(file_path, 'r') as f:
+                                        for line in f:
+                                            cols = line.strip().split()
+                                            if cols and len(cols) == 2:
+                                                data.append(int(cols[1]))
+                            else:
+                                print(file_path, "파일이 없습니다.")
+                            initial_port += 1
                  
                  # Storing the average of the 5 min values and 5 max values   
                 if data:
@@ -202,7 +218,7 @@ legend_elements = [Patch(facecolor=darken_color(pltcolors.to_rgb(colors[cc])), l
 ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.8, 1))
 
 ax.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
-plt.ylim(100, 990)
+plt.ylim(0, 300)
 # Saving the plot to the designated output directory
 output_directory = "./plots/"
 if not os.path.exists(output_directory):
