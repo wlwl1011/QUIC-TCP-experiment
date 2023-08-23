@@ -112,7 +112,7 @@ for standard in st:
                         
 
 # 3. Draw a graph representing the range of OWDs for all congestion control algorithms according to the error rate
-fig, ax = plt.subplots(figsize=(15, 10))
+fig, ax = plt.subplots(figsize=(25, 15))
 
 # Modify the graph plotting section:
 all_data = []
@@ -138,7 +138,8 @@ for error_rate_idx in range(len(count_loss)):
 group_width = 2 * len(cca)
 positions = [i + j * (group_width + 1) for j in range(len(count_loss)) for i in range(group_width)] 
 
-bp = ax.boxplot(all_data, positions=positions, patch_artist=True)
+#bp = ax.boxplot(all_data, positions=positions, patch_artist=True, showfliers=False)
+bp = ax.boxplot(all_data, positions=positions, widths=0.9, patch_artist=True, showfliers=False)
 
 # Set the x-tick labels and centers
 xtick_centers = [(group_width+1) * i + group_width / 2 for i in range(len(count_loss))]
@@ -174,16 +175,18 @@ ax.set_xticklabels(count_loss)
 ax.set_xlabel('Loss Count')
 ax.set_ylabel('One-Way Delay')
 ax.set_title('OWD Range for Each Congestion Control Algorithm in QUIC Grouped by Loss Count')
+factor = 0.2  # You can modify this value to adjust the spacing
+ax.set_xlim(min(positions) - factor * group_width, max(positions) + factor * group_width)
 
 # Legend based on colors
 # Legend based on colors
 from matplotlib.patches import Patch
 legend_elements = [Patch(facecolor=darken_color(pltcolors.to_rgb(colors[cc])), label=f"TCP with {cc}") for cc in cca] + \
                   [Patch(facecolor=colors[cc], label=f"QUIC with {cc}") for cc in cca]
-ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.8, 1))
+ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.88, 1))
 
 ax.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
-plt.ylim(0, 300)
+plt.ylim(0, 250)
 # Saving the plot to the designated output directory
 output_directory = "./plots/"
 if not os.path.exists(output_directory):
