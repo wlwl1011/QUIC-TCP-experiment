@@ -52,14 +52,14 @@ for standard in st:
                 cc_i = cca.index(cc)
                 
                 mins, maxs = [], []  # Temporary storage for the 5 min and max values
-                for number in range(1, 5 + 1):  # 5번 실험한다
-                    data = []
-                    initial_port = 49153  # 10 임
-                    initial_server_port = 1234
+                data = []
+                for number in range(1, 1 + 1):  # 5번 실험한다
+                    #data = []
+                    
                     defualt = '/home/minzzl/networkCongestion/ns-allinone-3.33/ns-3.33/traces'
                     if pro == 'QUIC':
-                        initial_port = 49153
-                        initial_server_port = 1234
+                        initial_port = 49161
+                        initial_server_port = 1242
                         for i in range(1):
                             file_path = defualt + '/{}/{}/{}/{}/{}/1_10.1.1.1:{}_10.1.3.2:{}_owd.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
@@ -73,14 +73,14 @@ for standard in st:
                                                 data.append(int(cols[2]))  # 시간이고 4
                             else:
                                 print(file_path, "파일이 없습니다.")
-                            initial_port += 1
+                            #initial_port += 1
                             #initial_server_port += 1
-                        
+                            
                     
                     else:
                         # TCP
-                        initial_port = 49153
-                        initial_server_port = 5000
+                        initial_port = 49157
+                        initial_server_port = 5004
                         for i in range(1):
                             file_path = defualt + '/{}/{}/{}/{}/{}/10.1.1.1_{}_10.1.3.2_{}_rtt.txt'.format(standard, count, pro, cc, number, initial_port, initial_server_port)
                             if os.path.isfile(file_path):
@@ -94,21 +94,17 @@ for standard in st:
                                                 data.append(int(cols[1]))
                             else:
                                 print(file_path, "파일이 없습니다.")
-                            initial_port += 1
+                            #initial_port += 1
+                            #initial_server_port += 1
                         
                  
             
                 if pro == 'QUIC':
-                    
-                    data_list_QUIC[cc_i][d_i].extend(data)   
-                    # print(cc,d_i,min_owd_QUIC[cc_i][d_i])     
-                    # print(cc,d_i,max_owd_QUIC[cc_i][d_i])   
+                    data_list_QUIC[cc_i][d_i].extend(data)
+                    #print(f"[Debug] {pro} {cc} for loss {count}: Min = {min(data)}, Max = {max(data)}")
                 else:
                     data_list_TCP[cc_i][d_i].extend(data)
-                    # min_owd_TCP[cc_i][d_i] = 100
-                    # max_owd_TCP[cc_i][d_i] = 800
-
-
+                    #print(f"[Debug] {pro} {cc} for loss {count}: Min = {min(data)}, Max = {max(data)}")
                         
 
 # 3. Draw a graph representing the range of OWDs for all congestion control algorithms according to the error rate
@@ -125,6 +121,9 @@ for error_rate_idx in range(len(count_loss)):
     for cc_idx, cc_label in enumerate(cca):
         # Get data for TCP
         data_tcp = data_list_TCP[cc_idx][error_rate_idx]
+        # if cca[cc_idx] == 'vegas':
+        #     print(cca[cc_idx], error_rate_idx)
+        #     print(len(data_tcp))
         current_error_data.append(data_tcp)
         
     # Then for QUIC
@@ -132,14 +131,30 @@ for error_rate_idx in range(len(count_loss)):
         # Get data for QUIC
         data_quic = data_list_QUIC[cc_idx][error_rate_idx]
         current_error_data.append(data_quic)
+        if cc_label == 'vegas':
+            print(f"Error Rate {error_rate_idx}: Max OWD for QUIC Vegas (Before Plot) = {max(data_quic)}")
     
     all_data.extend(current_error_data)  # Add the data for the current error rate
 
 group_width = 2 * len(cca)
 positions = [i + j * (group_width + 1) for j in range(len(count_loss)) for i in range(group_width)] 
 
-#bp = ax.boxplot(all_data, positions=positions, patch_artist=True, showfliers=False)
-bp = ax.boxplot(all_data, positions=positions, widths=0.9, patch_artist=True, showfliers=False)
+def annotate_boxplot(bp, data):
+    for i, median in enumerate(bp['medians']):
+        y_min = min(data[i])
+        y_max = max(data[i])
+        
+        plt.annotate(f"{int(y_min)}", (median.get_xdata()[0], y_min), 
+                     textcoords="offset points", xytext=(0,-15), ha='center', fontsize=8, color='red')
+        plt.annotate(f"{int(y_max)}", (median.get_xdata()[0], y_max), 
+                     textcoords="offset points", xytext=(0,5), ha='center', fontsize=8, color='red')
+        if y_max == 412:
+            print(f"Box for 412 value is at x={median.get_xdata()[0]}")
+
+#bp = ax.boxplot(all_data, positions=positions, widths=0.9, patch_artist=True, showfliers=False, whis='range')
+bp = ax.boxplot(all_data, positions=positions, widths=0.9, patch_artist=True, showfliers=False, whis=[0, 100])
+
+annotate_boxplot(bp, all_data)  # Add annotations to the box plot
 
 # Set the x-tick labels and centers
 xtick_centers = [(group_width+1) * i + group_width / 2 for i in range(len(count_loss))]
@@ -149,8 +164,9 @@ ax.set_xticks(xtick_centers)
 colors = {
     'bbr': 'pink',
     'cubic': 'gray',
+    'reno': 'skyblue',
     'vegas': 'purple',
-    'reno': 'skyblue'
+
 }
 
 count = 0
@@ -186,7 +202,7 @@ legend_elements = [Patch(facecolor=darken_color(pltcolors.to_rgb(colors[cc])), l
 ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.88, 1))
 
 ax.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
-plt.ylim(0, 250)
+plt.ylim(200, 900)
 # Saving the plot to the designated output directory
 output_directory = "./plots/"
 if not os.path.exists(output_directory):
