@@ -44,7 +44,7 @@ for standard in st:
                                             if cols != '' and cols != ' ' and len(cols)==2: 
                                                 if int(cols[1]) < 1000 :
                                                     
-                                                    congestion_window_arr_QUIC[d_i][cc_i].append([float(cols[0]),int(cols[1])]) #시간이고 4
+                                                    congestion_window_arr_QUIC[d_i][cc_i][0].append([float(cols[0]), int(cols[1])]) #시간이고 4
                             else:
                                 print(file_path,"파일이 없습니다.")
                         
@@ -65,8 +65,9 @@ for standard in st:
                                                 if int(cols[1]) < 1000 :
                                                     # if cc == 'bbr':
                                                     #     print(cols[1])
-                                                    
-                                                    congestion_window_arr_TCP[d_i][cc_i].append([float(cols[0]),int(cols[1])])
+                                                    #if float(cols[0]) <20:
+                                                    congestion_window_arr_TCP[d_i][cc_i][0].append([float(cols[0]), int(cols[1])])
+
                             else:
                                 print(file_path,"파일이 없습니다.")     
                         # if cc == "bbr":
@@ -78,50 +79,66 @@ for standard in st:
 # Continue from your code
 output_directory = "./plots/cwnd/"
 if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
+    os.makedirs(output_directory) 
 
-def plot_graph_for_cca(data, protocol, cca_name):
+# Define colors for QUIC and TCP algorithms
+quic_colors = {
+    'bbr': 'pink',
+    'cubic': 'gray',
+    'reno': 'skyblue',
+    'vegas': '#ba52a1'
+}
+
+tcp_colors = {
+    'bbr': '#e85d5d',
+    'cubic': '#424242',
+    'reno': '#4255a6',
+    'vegas': '#961277'
+}
+
+# Function to plot data
+def plot_graph(data_QUIC, data_TCP, loss_rate):
+    # Plotting for QUIC
     plt.figure(figsize=(10, 6))
-    for loss_rate in count_loss:
-        cc_i = cca.index(cca_name)
-        d_i = count_loss.index(loss_rate)
-
-        # Debug prints to check the data
-        #print(f"Debugging Information for {protocol} {cca_name} with loss rate = {loss_rate}:")
-        #print(f"data[d_i][cc_i] max = {max(data[d_i][cc_i])}")
+    loss_idx = count_loss.index(loss_rate)
+    for cc_algorithm in cca:
+        cc_idx = cca.index(cc_algorithm)
         
-        # Check for empty lists or invalid data
-        # if len(data[d_i][cc_i]) == 0:
-        #     print(f"No data available for {protocol} {cca_name} with loss rate = {loss_rate}")
-        #     continue
-
-        # Extract times and cwnd_values
-        times = [item[0] for item in data[d_i][cc_i] if len(item) > 1]
-        cwnd_values = [item[1] for item in data[d_i][cc_i] if len(item) > 1]
+        if len(data_QUIC[loss_idx][cc_idx][0]) > 0:
+            times = [item[0] for item in data_QUIC[loss_idx][cc_idx][0]]
+            cwnd_values = [item[1] for item in data_QUIC[loss_idx][cc_idx][0]]
+            plt.plot(times, cwnd_values, label=f"QUIC {cc_algorithm}", color=quic_colors[cc_algorithm])
         
-        # if protocol == 'TCP' and cca[cc_i] == 'vegas' and loss_rate == 1:
-        #     print(loss_rate)
-        #     print(times)
-        #     print(cwnd_values)
-     
-        plt.plot(times, cwnd_values, label=f'Loss Rate = {loss_rate}')
-    
-    # Plotting details
-    plt.title(f'{protocol} {cca_name} Congestion Window Over Time')
-    plt.xlabel('Time (seconds)')
-    plt.ylabel('cwnd (packets)')
+    plt.title(f"QUIC - Congestion Window Over Time (Loss Rate = {loss_rate})")
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("cwnd (packets)")
     plt.legend()
     plt.grid(True)
     plt.autoscale(axis='y', tight=True)
     plt.tight_layout()
-
-    # Save and show plot
-    file_name = f'{protocol}_{cca_name}_loss_cwnd.png'
-    #file_name = f'bbr.png'
-    plt.savefig(f"{output_directory}/{file_name}")
+    plt.savefig(f"{output_directory}/QUIC_loss_rate_{loss_rate}_cwnd.png")
     plt.show()
-# Plotting the graphs
-for cc in cca:
-    plot_graph_for_cca(congestion_window_arr_QUIC, 'QUIC', cc)
-    plot_graph_for_cca(congestion_window_arr_TCP, 'TCP', cc)
-# plot_graph_for_cca(congestion_window_arr_TCP, 'TCP', 'bbr')    
+
+    # Plotting for TCP
+    plt.figure(figsize=(10, 6))
+    for cc_algorithm in cca:
+        cc_idx = cca.index(cc_algorithm)
+        
+        if len(data_TCP[loss_idx][cc_idx][0]) > 0:
+            times = [item[0] for item in data_TCP[loss_idx][cc_idx][0]]
+            cwnd_values = [item[1] for item in data_TCP[loss_idx][cc_idx][0]]
+            plt.plot(times, cwnd_values, label=f"TCP {cc_algorithm}", color=tcp_colors[cc_algorithm])
+
+    plt.title(f"TCP - Congestion Window Over Time (Loss Rate = {loss_rate})")
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("cwnd (packets)")
+    plt.legend()
+    plt.grid(True)
+    plt.autoscale(axis='y', tight=True)
+    plt.tight_layout()
+    plt.savefig(f"{output_directory}/TCP_loss_rate_{loss_rate}_cwnd.png")
+    plt.show()
+
+# Plot graphs for each loss rate
+for loss_rate in count_loss:
+    plot_graph(congestion_window_arr_QUIC, congestion_window_arr_TCP, loss_rate)
