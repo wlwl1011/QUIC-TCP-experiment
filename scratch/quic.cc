@@ -89,6 +89,11 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
     stack.Install(topo);
     for (int i = 0; i < links; i++)
     {
+        std::cout << i << std::endl;
+        std::cout << "src : " << topoinfo[i].nodes[0] << std::endl;
+        std::cout << "dst : " << topoinfo[i].nodes[1] << std::endl;
+        std::cout << "bps : " << topoinfo[i].bandwidth << std::endl;
+        std::cout << "owd : " << topoinfo[i].propagation_ms << std::endl;
         uint16_t src = topoinfo[i].nodes[0];
         uint16_t dst = topoinfo[i].nodes[1];
         uint32_t bps = topoinfo[i].bandwidth;
@@ -96,20 +101,22 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
         NodeContainer nodes = NodeContainer(topo.Get(src), topo.Get(dst));
         auto bufSize = std::max<uint32_t>(DEFAULT_PACKET_SIZE, bps * buffer_ms / 8000);
         int packets = bufSize / DEFAULT_PACKET_SIZE;
-        // std::cout << "buffer_ms: " << buffer_ms << std::endl;
+        std::cout << "buffer_ms: " << buffer_ms << std::endl;
+        std::cout << "owd: " << owd << std::endl;
         // std::cout << "bps: " << bps << std::endl;
         // std::cout << "bufSize: " << bufSize << std::endl;
         // std::cout << "packets: " << packets << std::endl;
         PointToPointHelper pointToPoint;
         pointToPoint.SetDeviceAttribute("DataRate", DataRateValue(DataRate(bps)));
-        if (delay_integer == 0)
-        {
-            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
-        }
-        else
-        {
-            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
-        }
+        pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        // if (delay_integer == 0)
+        // {
+        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        // }
+        // else
+        // {
+        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
+        // }
 
         if (bottleneck_i == i)
         {
@@ -172,6 +179,7 @@ int main(int argc, char *argv[])
     std::string index = std::string("1");
     std::string loss_str("0"); // config random loss
     std::string link_delay_str("0");
+    std::string link_bps_str("10");
     std::string cc1("cubic");
     std::string cc2("cubic");
     std::string data_folder("no-one");
@@ -182,11 +190,13 @@ int main(int argc, char *argv[])
     cmd.AddValue("folder", "folder name to collect data", data_folder);
     cmd.AddValue("lo", "loss", loss_str); // 10 means the dev will introduce 10/1000 % random loss
     cmd.AddValue("de", "link_delay", link_delay_str);
+    cmd.AddValue("b", "link_bps", link_bps_str);
     cmd.AddValue("cc1", "congestion algorithm1", cc1);
     cmd.AddValue("cc2", "congestion algorithm2", cc2);
     cmd.Parse(argc, argv);
     int loss_integer = std::stoi(loss_str);
     int delay_integer = std::stoi(link_delay_str);
+    int bps_integer = std::stoi(link_bps_str);
     int index_integer = std::stoi(index);
     double random_loss = loss_integer * 1.0 / 100;
     std::unique_ptr<TriggerRandomLoss> triggerloss = nullptr;
@@ -268,9 +278,9 @@ int main(int argc, char *argv[])
         QuicServerTraceType server_log_flag = E_QS_ALL;
         RegisterExternalCongestionFactory();
         const uint32_t MBwUnit = 1000000;
-        // const uint32_t GBwUnit = 1000000000;
-        uint32_t non_bottleneck_bw = 50 * MBwUnit;
-        uint32_t bottleneck_bw = 50 * MBwUnit;
+        const uint32_t GBwUnit = 1000000000;
+        uint32_t non_bottleneck_bw = 100 * MBwUnit;
+        uint32_t bottleneck_bw = bps_integer * MBwUnit;
         // link 개수를 수정해줍니다.
         uint32_t links = 3;
         int bottleneck_i = 1;
@@ -284,9 +294,11 @@ int main(int argc, char *argv[])
             LinkProperty *info_ptr = topoinfo1;
             for (int i = 0; i < links; i++)
             {
+                topoinfo1[i].propagation_ms = delay_integer;
                 if (bottleneck_i == i)
                 {
                     info_ptr[i].bandwidth = bottleneck_bw;
+                    std::cout << bottleneck_bw << std::endl;
                 }
                 else
                 {
@@ -341,22 +353,6 @@ int main(int argc, char *argv[])
         uint16_t server_port = 1234;
         InetSocketAddress server_addr1(server_port);
 
-        // install server on h1
-
-        // {
-        //     Ptr<Node> host = topo.Get(1);
-        //     Ptr<QuicServerApp> server_app = CreateObject<QuicServerApp>(type);
-        //     host->AddApplication(server_app);
-        //     server_app->Bind(server_port);
-        //     server_addr1 = server_app->GetLocalAddress();
-        //     server_app->SetStartTime(Seconds(startTime));
-        //     server_app->SetStopTime(Seconds(simDuration) + Seconds(10));
-        //     if (server_trace)
-        //     {
-        //         server_app->set_trace(server_trace);
-        //     }
-        // }
-
         Ptr<Node> h0 = topo.Get(0);
 
         for (int i = 0; i < index_integer; i++)
@@ -368,13 +364,14 @@ int main(int argc, char *argv[])
             server_app->Bind(server_port + i);
             server_addr1 = server_app->GetLocalAddress();
             server_app->SetStartTime(Seconds(startTime));
-            server_app->SetStopTime(Seconds(simDuration) + Seconds(10));
+            server_app->SetStopTime(Seconds(simDuration));
             if (server_trace)
             {
                 server_app->set_trace(server_trace);
             }
             // install client
-            Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, cc1.c_str());
+            uint64_t totalTxBytes = 100000 * 15000;
+            Ptr<QuicClientApp> client_app = CreateObject<QuicClientApp>(type, cc1.c_str(), totalTxBytes);
             h0->AddApplication(client_app);
             client_app->Bind();
             InetSocketAddress client_addr = client_app->GetLocalAddress();
@@ -409,7 +406,7 @@ int main(int argc, char *argv[])
         }
 
         int last_time = WallTimeMillis();
-        Simulator::Stop(Seconds(startTime) + Seconds(20));
+        Simulator::Stop(Seconds(simDuration + 20.0));
         Simulator::Run();
         Simulator::Destroy();
         for (auto it = client_traces.begin(); it != client_traces.end(); it++)

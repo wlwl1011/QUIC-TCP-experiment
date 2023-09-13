@@ -1,4 +1,11 @@
-
+/** Network topology
+ *       n0            n1
+ *        |            |
+ *        | l0         | l2
+ *        |            |
+ *        n2---l1------n3
+ *
+ */
 #include <string>
 #include <unistd.h>
 #include <stdio.h>
@@ -95,15 +102,15 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
         // std::cout << "packets: "<<packets<<std::endl;
         PointToPointHelper pointToPoint;
         pointToPoint.SetDeviceAttribute("DataRate", DataRateValue(DataRate(bps)));
-        // pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
-        if (delay_integer == 0)
-        {
-            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
-        }
-        else
-        {
-            pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
-        }
+        pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        // if (delay_integer == 0)
+        // {
+        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
+        // }
+        // else
+        // {
+        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
+        // }
         if (bottleneck_i == i)
         {
             pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
@@ -147,17 +154,19 @@ int main(int argc, char *argv[])
     std::string cc2("bbr2");
     std::string folder_name("no-one");
     std::string loss_str("1");
+    std::string link_bps_str("10");
     std::string index = std::string("1");
     CommandLine cmd;
     cmd.AddValue("it", "instacne", instance);
     cmd.AddValue("de", "link_delay", link_delay_str);
+    cmd.AddValue("b", "link_bps", link_bps_str);
     cmd.AddValue("cc1", "congestion algorithm1", cc1);
     cmd.AddValue("cc2", "congestion algorithm2", cc2);
     cmd.AddValue("folder", "folder name to collect data", folder_name);
     cmd.AddValue("i", "index", index);
     cmd.AddValue("lo", "loss", loss_str);
     cmd.Parse(argc, argv);
-
+    int bps_integer = std::stoi(link_bps_str);
     int delay_integer = std::stoi(link_delay_str);
     int index_integer = std::stoi(index);
 
@@ -165,6 +174,7 @@ int main(int argc, char *argv[])
     // std::cout << index_integer << std::endl;
     // std::cout << index << std::endl;
     uint32_t kMaxmiumSegmentSize = 1400;
+    // 이거 설정 해줄까 말까
     Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(200 * kMaxmiumSegmentSize));
     Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(200 * kMaxmiumSegmentSize));
     Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(kMaxmiumSegmentSize));
@@ -208,11 +218,11 @@ int main(int argc, char *argv[])
         TcpBbrDebug::SetTraceFolder(trace_folder.c_str());
         TcpTracer::SetTraceFolder(trace_folder.c_str());
     }
-    const uint32_t MBwUnit = 1000000; // 1Mbps;
-    // const uint32_t GBwUnit = 1000000000; // 1Mbps;
+    const uint32_t MBwUnit = 1000000;    // 1Mbps;
+    const uint32_t GBwUnit = 1000000000; // 1Gbps;
 
-    uint32_t non_bottleneck_bw = 50 * MBwUnit;
-    uint32_t bottleneck_bw = 50 * MBwUnit;
+    uint32_t non_bottleneck_bw = 100 * MBwUnit;
+    uint32_t bottleneck_bw = bps_integer * MBwUnit;
     uint32_t links = 3;
     int bottleneck_i = 1;
     LinkProperty topoinfo1[] = {
@@ -225,9 +235,11 @@ int main(int argc, char *argv[])
         LinkProperty *info_ptr = topoinfo1;
         for (int i = 0; i < links; i++)
         {
+            topoinfo1[i].propagation_ms = delay_integer;
             if (bottleneck_i == i)
             {
                 info_ptr[i].bandwidth = bottleneck_bw;
+                std::cout << bottleneck_bw << std::endl;
             }
             else
             {
