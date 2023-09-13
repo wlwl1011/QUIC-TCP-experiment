@@ -1,37 +1,38 @@
 # quiche
 
-quiche is a work-in-progress QUIC implementation by BVC (Bilibili Video Cloud team). It is based on Google quiche(https://quiche.googlesource.com/quiche/). BVC uses this to enable gQUIC and iQUIC service capability on production, for example, there are quic proxy server and nginx quic module.
+quiche는 BVC(빌리빌리 비디오 클라우드 팀)에서 진행 중인 QUIC 구현 작업입니다. 구글 퀴시(https://quiche.googlesource.com/quiche/)를 기반으로 합니다. BVC는 이를 사용하여 프로덕션 환경에서 gQUIC 및 iQUIC 서비스 기능을 사용할 수 있으며, 예를 들어 quic 프록시 서버와 nginx quic 모듈이 있습니다.
 
-QUIC (Quick UDP Internet Connections) is a new transport which reduces latency compared to that of TCP. Look QUIC from 10000 feet, it is very similar to TCP+TLS+HTTP/2 implemented on UDP. Because TCP is implemented in operating system kernels, and middlebox firmware, making significant changes to TCP is next to impossible. However, since QUIC is built on top of UDP, it suffers from no such limitations.
+QUIC(빠른 UDP 인터넷 연결)은 TCP에 비해 지연 시간을 줄여주는 새로운 전송 방식입니다. QUIC을 10000피트 상공에서 보면, UDP에서 구현된 TCP+TLS+HTTP/2와 매우 유사합니다. TCP는 운영 체제 커널과 미들박스 펌웨어에 구현되어 있기 때문에 TCP를 크게 변경하는 것은 거의 불가능에 가깝습니다. 하지만 QUIC은 UDP를 기반으로 구축되었기 때문에 이러한 제약이 없습니다.
 
-Key features of QUIC+HTTP3 over existing TCP+TLS+HTTP2 include
-- User space implementation
-- Dramatically reduced connection establishment time
-- Improved congestion control
-- Multiplexing without head of line blocking
-- Connection migration
+기존 TCP+TLS+HTTP2에 비해 QUIC+HTTP3의 주요 특징은 다음과 같습니다.
+- 사용자 공간 구현
+- 획기적으로 단축된 연결 설정 시간
+- 향상된 혼잡 제어
+- 헤드 오브 라인 차단 없는 멀티플렉싱
+- 연결 마이그레이션
 
-Google quiche is used in Chromium (http://www.chromium.org/quic) project. This repository integrates google quiche with some common-used repositories, which are independent of Chromium platform.
-- Platform related implementations of epoll server/client, http2 stack, quic stack
-- Rewrite include directives for google quiche source files
+구글 키시는 Chromium(http://www.chromium.org/quic) 프로젝트에서 사용됩니다. 이 리파지토리는 구글 키시를 크롬 플랫폼과는 별개로 일반적으로 사용되는 일부 리파지토리와 통합한 것입니다.
+- epoll 서버/클라이언트, http2 스택, quic 스택의 플랫폼 관련 구현
+- 구글 키시 소스 파일에 대한 지시어 포함 재작성
 
-### Features
-- Easy building with cmake
-- Only support Linux platform
-- Easy to keep pace with Google quiche upgrading
+### 특징
+- cmake를 이용한 쉬운 빌드
+- 리눅스 플랫폼만 지원
+- 구글 키쉬 업그레이드에 쉽게 따라갈 수 있습니다.
 
-### Source Layout
-- `base`: Implementation of basic platform functions
-- `googleurl`: Googleurl source files
-- `gquiche`: Google quiche source files 
-- `net`: Implementation of platform net related functions
-- `platform/epoll_platform_impl`: Implementation of epoll client and server functions
-- `platform/http2_platform_impl`: Implementation of http2 stack functions
-- `platform/quic_platform_impl`: Implementation of quic stack functions
-- `platform/quiche_platform_impl`: Implementation of google quiche platform functions
-- `platform/spdy_platform_impl`: Implementation of spdy stack functions
-- `third_party`: Submodules of thirdparty repositories
-- `utils`: Scripts of some usefull utilities
+### 소스 레이아웃
+- 베이스`: 기본 플랫폼 기능 구현
+- 구글URL`: 구글URL 소스 파일
+- `gquiche`: 구글 키쉬 소스 파일 
+- net`: 플랫폼 넷 관련 함수 구현
+- 플랫폼/에폴_플랫폼_임플`: epoll 클라이언트 및 서버 함수 구현
+- platform/http2_platform_impl`: http2 스택 함수 구현
+- platform/quic_platform_impl`: quic 스택 함수 구현
+- 플랫폼/퀴시_플랫폼_임플란트`: 구글 키시 플랫폼 함수 구현
+- 플랫폼/spdy_플랫폼_임플`: spdy 스택 함수 구현
+- `third_party`: 서드파티 리포지토리의 서브모듈
+- utils`: 몇 가지 유용한 유틸리티의 스크립트
+
 
 ## Getting Started
 
