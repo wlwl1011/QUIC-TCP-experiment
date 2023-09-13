@@ -16,7 +16,8 @@ apt-get install cmake build-essential protobuf-compiler libprotobuf-dev golang-g
 
 ## 빌드
 
-Download quiche library first. And I unzip the quiche.zip under "/home/xxx/"
+먼저 quic 라이브러리가 필요합니다.
+quic 라이브러리는 해당 레파지토리 안에 삽입되어 있습니다. (quiche 폴더) 
 
 ```
 cd quiche
