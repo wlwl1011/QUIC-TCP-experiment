@@ -66,7 +66,7 @@ struct LinkProperty
 };
 uint32_t CalMaxRttInDumbbell(LinkProperty *topoinfo, int links)
 {
-    uint32_t rtt1 = 2 * (topoinfo[0].propagation_ms + topoinfo[1].propagation_ms + topoinfo[2].propagation_ms);
+    uint32_t rtt1 = (topoinfo[0].propagation_ms + topoinfo[1].propagation_ms + topoinfo[2].propagation_ms);
 
     return rtt1;
 }
@@ -80,7 +80,7 @@ uint32_t CalMaxRttInDumbbell(LinkProperty *topoinfo, int links)
 #define DEFAULT_PACKET_SIZE 1500
 int ip = 1;
 static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bottleneck_i,
-                                       uint32_t buffer_ms, uint32_t delay_integer, TriggerRandomLoss *trigger = nullptr)
+                                       uint32_t buffer_ms, uint32_t queue_size_factor, TriggerRandomLoss *trigger = nullptr)
 {
     int hosts = links + 1;
     NodeContainer topo;
@@ -89,44 +89,18 @@ static NodeContainer BuildDumbbellTopo(LinkProperty *topoinfo, int links, int bo
     stack.Install(topo);
     for (int i = 0; i < links; i++)
     {
-        std::cout << i << std::endl;
-        std::cout << "src : " << topoinfo[i].nodes[0] << std::endl;
-        std::cout << "dst : " << topoinfo[i].nodes[1] << std::endl;
-        std::cout << "bps : " << topoinfo[i].bandwidth << std::endl;
-        std::cout << "owd : " << topoinfo[i].propagation_ms << std::endl;
         uint16_t src = topoinfo[i].nodes[0];
         uint16_t dst = topoinfo[i].nodes[1];
         uint32_t bps = topoinfo[i].bandwidth;
         uint32_t owd = topoinfo[i].propagation_ms;
         NodeContainer nodes = NodeContainer(topo.Get(src), topo.Get(dst));
-        auto bufSize = std::max<uint32_t>(DEFAULT_PACKET_SIZE, bps * buffer_ms / 8000);
+        auto bufSize = std::max<uint32_t>(DEFAULT_PACKET_SIZE, bps * buffer_ms * queue_size_factor / 8000); // BDP = rtt * bw
         int packets = bufSize / DEFAULT_PACKET_SIZE;
-        std::cout << "buffer_ms: " << buffer_ms << std::endl;
-        std::cout << "owd: " << owd << std::endl;
-        // std::cout << "bps: " << bps << std::endl;
-        // std::cout << "bufSize: " << bufSize << std::endl;
-        // std::cout << "packets: " << packets << std::endl;
         PointToPointHelper pointToPoint;
         pointToPoint.SetDeviceAttribute("DataRate", DataRateValue(DataRate(bps)));
         pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
-        // if (delay_integer == 0)
-        // {
-        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(owd)));
-        // }
-        // else
-        // {
-        //     pointToPoint.SetChannelAttribute("Delay", TimeValue(MilliSeconds(delay_integer)));
-        // }
+        pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
 
-        if (bottleneck_i == i)
-        {
-            pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
-        }
-        else
-        {
-            pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
-        }
-        // pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue(std::to_string(packets) + "p"));
         NetDeviceContainer devices = pointToPoint.Install(nodes);
         if (bottleneck_i == i)
         {
@@ -179,7 +153,8 @@ int main(int argc, char *argv[])
     std::string index = std::string("1");
     std::string loss_str("0"); // config random loss
     std::string link_delay_str("0");
-    std::string link_bps_str("10");
+    std::string link_bps_str("5");
+    std::string q_sieze_str("1"); // 얕은 버퍼 성능 확인
     std::string cc1("cubic");
     std::string cc2("cubic");
     std::string data_folder("no-one");
@@ -190,11 +165,13 @@ int main(int argc, char *argv[])
     cmd.AddValue("folder", "folder name to collect data", data_folder);
     cmd.AddValue("lo", "loss", loss_str); // 10 means the dev will introduce 10/1000 % random loss
     cmd.AddValue("de", "link_delay", link_delay_str);
+    cmd.AddValue("q", "q_size", q_sieze_str);
     cmd.AddValue("b", "link_bps", link_bps_str);
     cmd.AddValue("cc1", "congestion algorithm1", cc1);
     cmd.AddValue("cc2", "congestion algorithm2", cc2);
     cmd.Parse(argc, argv);
     int loss_integer = std::stoi(loss_str);
+    int queue_size_integer = std::stoi(q_sieze_str);
     int delay_integer = std::stoi(link_delay_str);
     int bps_integer = std::stoi(link_bps_str);
     int index_integer = std::stoi(index);
@@ -279,7 +256,7 @@ int main(int argc, char *argv[])
         RegisterExternalCongestionFactory();
         const uint32_t MBwUnit = 1000000;
         const uint32_t GBwUnit = 1000000000;
-        uint32_t non_bottleneck_bw = 100 * MBwUnit;
+        uint32_t non_bottleneck_bw = 100 * MBwUnit; // 100Mbps 로 제한 - 영향 최소화.
         uint32_t bottleneck_bw = bps_integer * MBwUnit;
         // link 개수를 수정해줍니다.
         uint32_t links = 3;
@@ -294,11 +271,11 @@ int main(int argc, char *argv[])
             LinkProperty *info_ptr = topoinfo1;
             for (int i = 0; i < links; i++)
             {
-                topoinfo1[i].propagation_ms = delay_integer;
+
                 if (bottleneck_i == i)
                 {
                     info_ptr[i].bandwidth = bottleneck_bw;
-                    std::cout << bottleneck_bw << std::endl;
+                    topoinfo1[i].propagation_ms = delay_integer;
                 }
                 else
                 {
@@ -310,37 +287,11 @@ int main(int argc, char *argv[])
         LinkProperty *topoinfo_ptr = nullptr;
         uint32_t buffer_ms = 0;
 
-        if (0 == instance.compare("1"))
-        {
-            topoinfo_ptr = topoinfo1;
-            uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
-            buffer_ms = rtt;
-        }
-        else if (0 == instance.compare("2"))
-        {
-            topoinfo_ptr = topoinfo1;
-            uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
-            buffer_ms = 3 * rtt / 2;
-        }
-        else if (0 == instance.compare("3"))
-        {
-            topoinfo_ptr = topoinfo1;
-            uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
-            buffer_ms = 4 * rtt / 2;
-        }
-        else if (0 == instance.compare("4"))
-        {
-            topoinfo_ptr = topoinfo1;
-            uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
-            buffer_ms = 6 * rtt / 2;
-        }
-        else
-        {
-            topoinfo_ptr = topoinfo1;
-            uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
-            buffer_ms = 4 * rtt / 2;
-        }
-        NodeContainer topo = BuildDumbbellTopo(topoinfo_ptr, links, bottleneck_i, buffer_ms, delay_integer, triggerloss.get());
+        topoinfo_ptr = topoinfo1;
+        uint32_t rtt = CalMaxRttInDumbbell(topoinfo_ptr, links);
+        buffer_ms = rtt;
+
+        NodeContainer topo = BuildDumbbellTopo(topoinfo_ptr, links, bottleneck_i, buffer_ms, queue_size_integer, triggerloss.get());
 
         std::vector<Ns3QuicClientTrace *> client_traces;
         Ns3QuicServerTraceDispatcher *server_trace = nullptr;
@@ -376,7 +327,7 @@ int main(int argc, char *argv[])
             client_app->Bind();
             InetSocketAddress client_addr = client_app->GetLocalAddress();
             client_app->set_peer(server_addr1.GetIpv4(), server_addr1.GetPort());
-            client_app->SetStartTime(Seconds(startTime));
+            client_app->SetStartTime(Seconds(startTime)); // flow흐름을 여러개 발생
             client_app->SetStopTime(Seconds(simDuration));
             Ns3QuicAddressPair addr_pair(client_addr, server_addr1);
             if (client_log_flag & E_QC_ALL)
